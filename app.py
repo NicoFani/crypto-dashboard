@@ -3,18 +3,20 @@ import requests
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+import time
 
 # Configuración de la página
 st.set_page_config(page_title="Crypto Dashboard", layout="wide")
 
 # Título
-st.title("📈 Dashboard de Criptomonedas")
+st.title("📈 Crypto Dashboard")
+st.divider()
 
 # CSS para personalizar el tamaño de la fuente y mejorar la estética
 st.markdown("""
     <style>
         /* Cambiar tamaño de fuente para toda la página */
-        body {
+        html, body {
             font-size: 18px;
         }
         
@@ -76,6 +78,7 @@ def get_data():
             "total_volume": "Volumen Total",
             "high_24h": "Máximo 24h",
             "low_24h": "Mínimo 24h"
+            # Don't rename "id" column so we can use it later
         })
 
         # Convertir el símbolo a mayúsculas
@@ -86,10 +89,14 @@ def get_data():
         st.error("Error al obtener datos de la API")
         return pd.DataFrame()
 
-# Función para obtener el historial de precios para los gráficos
-def get_crypto_data(crypto_id="bitcoin"):
+
+
+# Función modificada para obtener datos históricos con periodo personalizable
+@st.cache_data(ttl=3600, show_spinner=False)
+def get_crypto_data(crypto_id="bitcoin", days="30"):
     url = f"https://api.coingecko.com/api/v3/coins/{crypto_id}/market_chart"
-    params = {"vs_currency": "usd", "days": "30", "interval": "daily"}
+    params = {"vs_currency": "usd", "days": days}
+    
     response = requests.get(url, params=params)
     
     # Verificar si la respuesta es válida y contiene 'prices'
@@ -106,73 +113,132 @@ def get_crypto_data(crypto_id="bitcoin"):
         st.error("Error al obtener datos de la API. Código de respuesta: {}".format(response.status_code))
         return None
 
-# Función para el gráfico de precio a lo largo del tiempo
+# Función mejorada para el gráfico de precio con selector de periodo (sin opción de 1 día)
 def price_time_graph(crypto_id):
-    historical_data = get_crypto_data(crypto_id)
+    # Opciones de periodo de tiempo (eliminada la opción de 1 día)
+    time_options = {
+        "7 días": "7",
+        "14 días": "14",
+        "1 mes": "30",
+        "1 año": "365"
+    }
     
-    if historical_data is not None:
-        prices = historical_data.get('prices', [])
-        
-        # Verificar que 'prices' contenga datos
-        if prices:
-            try:
-                # Convertir los datos a un DataFrame
-                df_prices = pd.DataFrame(prices, columns=["Fecha", "Precio"])
-                df_prices['Fecha'] = pd.to_datetime(df_prices['Fecha'], unit='ms')
+    # Crear contenedor para el gráfico
+    chart_container = st.container()
 
-                # Graficar
-                fig = px.line(df_prices, x='Fecha', y='Precio', title=f"Precio de {crypto_id} a lo largo del tiempo")
-                st.plotly_chart(fig)
-            except Exception as e:
-                st.error(f"Error al procesar los datos para el gráfico de líneas: {e}")
-        else:
-            st.error("No se encontraron datos de precios disponibles.")
-    else:
-        st.error("No se pudo cargar el gráfico de precios.")
-
-# Función para el gráfico de velas (candlestick)
-def candlestick_graph(crypto_id):
-    historical_data = get_crypto_data(crypto_id)
+        # CSS personalizado para mejorar la estética de los botones
+    st.markdown("""
+    <style>
+    div.stButton > button {
+        padding: 5px 10px;
+        font-size: 14px;
+        width: 100%;
+        border-radius: 5px;
+        margin: 0 2px;
+    }
     
-    if historical_data is not None:
-        prices = historical_data.get('prices', [])
+    /* Estilo para el botón activo */
+    div.stButton > button:focus {
+        color: white;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Crear un contenedor centrado para los botones usando columns
+    _, col_buttons, _ = st.columns([0.2, 0.6, 0.2])  # Centra los botones usando espacios a los lados
+    
+    with col_buttons:
+        # Crear una fila horizontal de botones más cercanos entre sí
+        button_cols = st.columns(4)  # 5 botones en una fila
         
-        # Verificar que 'prices' contenga datos
-        if prices:
-            try:
-                # Convertir los datos a un DataFrame
-                df_prices = pd.DataFrame(prices, columns=["Fecha", "Precio"])
-                df_prices['Fecha'] = pd.to_datetime(df_prices['Fecha'], unit='ms')
+        with button_cols[0]:
+            days_7 = st.button("7 días")
+        with button_cols[1]:
+            days_14 = st.button("14 días")
+        with button_cols[2]:
+            month_1 = st.button("1 mes")
+        with button_cols[3]:
+            year_1 = st.button("1 año")
+    
+    # Determinar el periodo seleccionado basado en los botones
+    if 'selected_period' not in st.session_state:
+        st.session_state.selected_period = "30"  # Valor por defecto: 1 mes
+    
+    if days_7:
+        st.session_state.selected_period = "7"
+    elif days_14:
+        st.session_state.selected_period = "14"
+    elif month_1:
+        st.session_state.selected_period = "30"
+    elif year_1:
+        st.session_state.selected_period = "365"
+    
+    # Obtener datos para el periodo seleccionado
+    with st.spinner("Cargando datos de precios..."):
+        historical_data = get_crypto_data(crypto_id, st.session_state.selected_period)
+    
+    # Encontrar el nombre legible del periodo
+    period_name = [name for name, value in time_options.items() if value == st.session_state.selected_period][0]
+    
+    # Mostrar gráfico en el contenedor
+    with chart_container:
+        if historical_data is not None:
+            prices = historical_data.get('prices', [])
+            
+            # Verificar que 'prices' contenga datos
+            if prices:
+                try:
+                    # Convertir los datos a un DataFrame
+                    df_prices = pd.DataFrame(prices, columns=["Fecha", "Precio"])
+                    df_prices['Fecha'] = pd.to_datetime(df_prices['Fecha'], unit='ms')
 
-                # Crear columnas para el gráfico de velas (usando el mismo valor para open, high, low, close)
-                df_prices['Open'] = df_prices['Precio']
-                df_prices['High'] = df_prices['Precio']
-                df_prices['Low'] = df_prices['Precio']
-                df_prices['Close'] = df_prices['Precio']
+                    # Determinar el formato de fecha basado en el periodo
+                    if st.session_state.selected_period in ["7", "14"]:
+                        date_format = '%d %b'  # Formato día mes para periodos cortos
+                    else:
+                        date_format = '%d %b %Y'  # Formato día mes año para periodos largos
 
-                # Graficar el gráfico de velas
-                fig = go.Figure(data=[go.Candlestick(x=df_prices['Fecha'],
-                                                     open=df_prices['Open'], high=df_prices['High'],
-                                                     low=df_prices['Low'], close=df_prices['Close'])])
-
-                fig.update_layout(title=f"Gráfico de Velas de {crypto_id}", xaxis_title='Fecha', yaxis_title='Precio (USD)')
-                st.plotly_chart(fig)
-            except Exception as e:
-                st.error(f"Error al procesar los datos para el gráfico de velas: {e}")
+                    # Graficar con título actualizado que incluye el periodo
+                    
+                    upper_crypto_id = crypto_id.upper()
+                    
+                    fig = px.line(
+                        df_prices, 
+                        x='Fecha', 
+                        y='Precio', 
+                    )
+                    
+                    # Configuración adicional del gráfico
+                    fig.update_layout(
+                        xaxis_title='Fecha',
+                        yaxis_title='Precio (USD)',
+                        hovermode='x unified'
+                    )
+                    
+                    # Formatear etiquetas del eje x según el periodo
+                    fig.update_xaxes(
+                        tickformat=date_format,
+                        tickangle=-45 if st.session_state.selected_period in ["7", "14"] else 0
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.error(f"Error al procesar los datos para el gráfico de líneas: {e}")
+            else:
+                st.error("No se encontraron datos de precios disponibles.")
         else:
-            st.error("No se encontraron datos de precios disponibles para el gráfico de velas.")
-    else:
-        st.error("No se pudo cargar el gráfico de velas.")
+            st.error("No se pudo cargar el gráfico de precios.")
 
 # Menú de navegación en la barra lateral
 nav_option = st.sidebar.radio(
     "Selecciona una opción",
-    ("Datos en Tiempo Real", "Comparación de Precios", "Capitalización de Mercado", "Gráfico de Precio", "Gráfico de Velas"),
+    ("Datos en Tiempo Real", "Comparación de Precios", "Capitalización de Mercado", "Gráfico de Precio"),
     index=0  # La opción por defecto es "Datos en Tiempo Real"
 )
 
 # Obtener los datos
-df = get_data()
+with st.spinner("Cargando datos..."):
+    df = get_data()
 
 # Sección: Datos en Tiempo Real
 if nav_option == "Datos en Tiempo Real":
@@ -195,25 +261,19 @@ elif nav_option == "Capitalización de Mercado":
     df_top10 = df.head(10)
     fig2 = px.pie(
         df_top10, names="Nombre", values="Capitalización de Mercado", 
-        title="Distribución de Capitalización (Top 10)",
         labels={"Nombre": "Criptomoneda", "Capitalización de Mercado": "Capitalización (USD)"}
     )
     st.plotly_chart(fig2)
 
 # Sección: Gráfico de Precio (Basado en selección)
 elif nav_option == "Gráfico de Precio":
-    st.subheader("📉 Gráfico de Precio")
-    st.markdown("Proximamente...")
-    # Mostrar el top 10 para seleccionar una criptomoneda
-    # crypto_options = df.head(10)["Nombre"].tolist()
-    # selected_crypto = st.selectbox("Selecciona una criptomoneda", crypto_options)
-    # price_time_graph(selected_crypto)
-
-# Sección: Gráfico de Velas (Basado en selección)
-elif nav_option == "Gráfico de Velas":
-    st.subheader("📊 Gráfico de Velas")
-    st.markdown("Proximamente...")
-    # Mostrar el top 10 para seleccionar una criptomoneda
-    # crypto_options = df.head(10)["Nombre"].tolist()
-    # selected_crypto = st.selectbox("Selecciona una criptomoneda", crypto_options)
-    # candlestick_graph(selected_crypto)
+    st.subheader("📉 Gráfico de Precio historico")
+    # Create a mapping of display names to IDs
+    crypto_map = dict(zip(df["Nombre"], df["id"]))
+    # Display options using names
+    crypto_options = df.head(10)["Nombre"].tolist()
+    selected_crypto_name = st.selectbox("Selecciona una criptomoneda", crypto_options)
+    # Get the corresponding ID
+    selected_crypto_id = crypto_map.get(selected_crypto_name)
+    # Use the ID for API calls
+    price_time_graph(selected_crypto_id)
