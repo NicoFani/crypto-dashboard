@@ -203,15 +203,17 @@ elif nav_option == "Capitalización de Mercado":
 # Sección: Gráfico de Precio (Basado en selección)
 elif nav_option == "Gráfico de Precio":
     st.subheader("📉 Gráfico de Precio")
+    st.markdown("Proximamente...")
     # Mostrar el top 10 para seleccionar una criptomoneda
-    crypto_options = df.head(10)["Nombre"].tolist()
-    selected_crypto = st.selectbox("Selecciona una criptomoneda", crypto_options)
-    price_time_graph(selected_crypto)
+    # crypto_options = df.head(10)["Nombre"].tolist()
+    # selected_crypto = st.selectbox("Selecciona una criptomoneda", crypto_options)
+    # price_time_graph(selected_crypto)
 
 # Sección: Gráfico de Velas (Basado en selección)
 elif nav_option == "Gráfico de Velas":
     st.subheader("📊 Gráfico de Velas")
+    st.markdown("Proximamente...")
     # Mostrar el top 10 para seleccionar una criptomoneda
-    crypto_options = df.head(10)["Nombre"].tolist()
-    selected_crypto = st.selectbox("Selecciona una criptomoneda", crypto_options)
-    candlestick_graph(selected_crypto)
+    # crypto_options = df.head(10)["Nombre"].tolist()
+    # selected_crypto = st.selectbox("Selecciona una criptomoneda", crypto_options)
+    # candlestick_graph(selected_crypto)
