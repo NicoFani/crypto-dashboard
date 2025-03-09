@@ -115,7 +115,7 @@ def get_data():
         df = df.rename(columns={
             "name": "Nombre",
             "symbol": "Símbolo",
-            "current_price": "Precio Actual (USD)",
+            "current_price": "Precio Actual",
             "market_cap": "Capitalización de Mercado",
             "total_volume": "Volumen Total",
             "high_24h": "Máximo 24h",
@@ -392,15 +392,16 @@ with st.spinner("Cargando datos..."):
 # Sección: Datos en Tiempo Real
 if nav_option == "Datos en Tiempo Real":
     st.subheader("📋 Datos en Tiempo Real")
-    st.dataframe(df[["Nombre", "Símbolo", "Precio Actual (USD)", "Capitalización de Mercado", "Volumen Total", "Máximo 24h", "Mínimo 24h"]])
+    st.dataframe(df[["Nombre", "Símbolo", "Precio Actual", "Capitalización de Mercado", "Volumen Total", "Máximo 24h", "Mínimo 24h"]])
+    st.markdown("Todos los valores estan expresados en Dolares Estadounidenses (USD)")
 
 # Sección: Comparación de Precios (Top 10)
 elif nav_option == "Comparación de Precios":
     st.subheader("💰 Comparación de Precios")
     df_top10 = df.head(10)
     fig = px.bar(
-        df_top10, x="Nombre", y="Precio Actual (USD)", text="Precio Actual (USD)", color="Nombre",
-        labels={"Nombre": "Criptomoneda", "Precio Actual (USD)": "Precio en USD"}
+        df_top10, x="Nombre", y="Precio Actual", text="Precio Actual", color="Nombre",
+        labels={"Nombre": "Criptomoneda", "Precio Actual": "Precio en USD"}
     )
     # Actualizar el fondo del gráfico para que coincida con Streamlit
     fig.update_layout(
@@ -408,6 +409,7 @@ elif nav_option == "Comparación de Precios":
         paper_bgcolor="rgba(250, 250, 250, 0)"
     )
     st.plotly_chart(fig, use_container_width=True)
+    st.markdown("Todos los valores estan expresados en Dolares Estadounidenses (USD)")
 
 # Sección: Capitalización de Mercado (Top 10)
 elif nav_option == "Capitalización de Mercado":
@@ -417,8 +419,13 @@ elif nav_option == "Capitalización de Mercado":
         df_top10, names="Nombre", values="Capitalización de Mercado", 
         labels={"Nombre": "Criptomoneda", "Capitalización de Mercado": "Capitalización (USD)"}
     )
+    fig2.update_layout(
+        width=500,
+        height=500,
+    )
 
     st.plotly_chart(fig2)
+    st.markdown("Todos los valores estan expresados en Dolares Estadounidenses (USD)")
 
 # Sección: Gráfico de Precio (Basado en selección)
 elif nav_option == "Gráfico de Precio":
