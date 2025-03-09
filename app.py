@@ -7,10 +7,7 @@ import time
 from datetime import datetime
 
 # Configuración de la página
-st.set_page_config(page_title="Crypto Dashboard", layout="wide")
-
-# Título
-st.title("📈 Dashboard de Criptomonedas")
+st.set_page_config(page_title="Crypto Data", page_icon="assets/logo.png", layout="wide")
 
 # CSS para personalizar el tamaño de la fuente y mejorar la estética
 st.markdown("""
@@ -377,13 +374,25 @@ def price_time_graph(crypto_id):
         else:
             st.error("No se pudo cargar el gráfico de precios.")
 
+# Agregar el logo y el nombre de la aplicación en la barra lateral
 
-# Menú de navegación en la barra lateral
+st.sidebar.markdown(
+    """
+    <div style="display: flex; flex-direction: column; align-items: center;">
+        <h1 style="margin-left: 10px; font-size: 36px; font-weight: bold;">CRYPTO DATA</h1>
+        <hr style="margin: 10px 0px; border: 0; height: 1px; background-color: #ddd; width: 100%;">
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+# Menú de navegación en la barra lateral sin el título
 nav_option = st.sidebar.radio(
-    "Selecciona una opción",
-    ("Datos en Tiempo Real", "Comparación de Precios", "Capitalización de Mercado", "Gráfico de Precio", "Noticias de Criptomonedas"),
+    "",
+    ("Datos en Tiempo Real", "Comparación de Precios", "Capitalización de Mercado", "Gráfico de Precio", "Destacadas de Hoy", "Noticias de Criptomonedas"),
     index=0  # La opción por defecto es "Datos en Tiempo Real"
 )
+
 
 # Obtener los datos
 with st.spinner("Cargando datos..."):
@@ -391,13 +400,15 @@ with st.spinner("Cargando datos..."):
 
 # Sección: Datos en Tiempo Real
 if nav_option == "Datos en Tiempo Real":
-    st.subheader("📋 Datos en Tiempo Real")
+    st.header("📋 Datos en Tiempo Real")
+    st.divider()
     st.dataframe(df[["Nombre", "Símbolo", "Precio Actual", "Capitalización de Mercado", "Volumen Total", "Máximo 24h", "Mínimo 24h"]])
     st.markdown("Todos los valores estan expresados en Dolares Estadounidenses (USD)")
 
 # Sección: Comparación de Precios (Top 10)
 elif nav_option == "Comparación de Precios":
-    st.subheader("💰 Comparación de Precios")
+    st.header("💰 Comparación de Precios")
+    st.divider()
     df_top10 = df.head(10)
     fig = px.bar(
         df_top10, x="Nombre", y="Precio Actual", text="Precio Actual", color="Nombre",
@@ -413,7 +424,8 @@ elif nav_option == "Comparación de Precios":
 
 # Sección: Capitalización de Mercado (Top 10)
 elif nav_option == "Capitalización de Mercado":
-    st.subheader("🌎 Capitalización de Mercado")
+    st.header("🌎 Capitalización de Mercado")
+    st.divider()
     df_top10 = df.head(10)
     fig2 = px.pie(
         df_top10, names="Nombre", values="Capitalización de Mercado", 
@@ -429,7 +441,8 @@ elif nav_option == "Capitalización de Mercado":
 
 # Sección: Gráfico de Precio (Basado en selección)
 elif nav_option == "Gráfico de Precio":
-    st.subheader("📉 Gráfico de Precio historico")
+    st.header("📉 Gráfico de Precio historico")
+    st.divider()
     # Create a mapping of display names to IDs
     crypto_map = dict(zip(df["Nombre"], df["id"]))
     # Display options using names
@@ -440,10 +453,34 @@ elif nav_option == "Gráfico de Precio":
     # Use the ID for API calls
     price_time_graph(selected_crypto_id)
 
+elif nav_option == "Destacadas de Hoy":
+    st.header("⚡ Criptomonedas Destacadas del Día")
+    st.divider()
+    # Identificamos las criptomonedas destacadas
+    max_price = df.loc[df["price_change_percentage_24h"].idxmax()]
+    min_price = df.loc[df["price_change_percentage_24h"].idxmin()]
+    max_market_cap = df.loc[df["market_cap_change_percentage_24h"].idxmax()]
+    max_volume = df.loc[df["Volumen Total"].idxmax()]  # Mayor volumen total en 24h
+
+    # Mostrar resultados en tarjetas informativas
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.metric(label="📈 Mayor subida de precio", value=max_price["Nombre"], delta=f"{max_price['price_change_percentage_24h']:.2f}%")
+        st.metric(label="🏆 Mayor crecimiento Market Cap", value=max_market_cap["Nombre"], delta=f"{max_market_cap['market_cap_change_percentage_24h']:.2f}%")
+
+    with col2:
+        st.metric(label="📉 Mayor caída de precio", value=min_price["Nombre"], delta=f"{min_price['price_change_percentage_24h']:.2f}%")
+        st.metric(label="🔥 Mayor volumen total", value=max_volume["Nombre"], delta=f"{max_volume['Volumen Total']:.2f} USD")
+
+    st.markdown("_Datos actualizados diariamente._")
+
+
+
 # Nueva sección: Noticias de Criptomonedas
 elif nav_option == "Noticias de Criptomonedas":
-    st.subheader("📰 Últimas Noticias de Criptomonedas")
-    
+    st.header("📰 Últimas Noticias de Criptomonedas")
+    st.divider()
     # Opciones para filtrar noticias
     col1, col2 = st.columns([3, 1])
     
