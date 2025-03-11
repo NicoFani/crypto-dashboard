@@ -1,10 +1,9 @@
 import streamlit as st
-import requests
 import pandas as pd
-import plotly.graph_objects as go
 import plotly.express as px
-import time
-from datetime import datetime
+from data_fetcher import get_data, get_crypto_data
+from news_fetcher import get_crypto_news, display_news
+from utils import format_timestamp
 
 # Configuración de la página
 st.set_page_config(page_title="Crypto Data", page_icon="assets/logo.png", layout="wide")
@@ -90,144 +89,6 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
-
-# API de CoinGecko
-API_URL = "https://api.coingecko.com/api/v3/coins/markets"
-params = {
-    "vs_currency": "usd",
-    "order": "market_cap_desc",
-    "per_page": 50,  # Mostrar el top 50 de criptos
-    "page": 1,
-    "sparkline": False
-}
-
-# Función para obtener datos de criptomonedas
-@st.cache_data
-def get_data():
-    response = requests.get(API_URL, params=params)
-    if response.status_code == 200:
-        df = pd.DataFrame(response.json())
-
-        # Renombrar columnas
-        df = df.rename(columns={
-            "name": "Nombre",
-            "symbol": "Símbolo",
-            "current_price": "Precio Actual",
-            "market_cap": "Capitalización de Mercado",
-            "total_volume": "Volumen Total",
-            "high_24h": "Máximo 24h",
-            "low_24h": "Mínimo 24h"
-            # Don't rename "id" column so we can use it later
-        })
-
-        # Convertir el símbolo a mayúsculas
-        df["Símbolo"] = df["Símbolo"].str.upper()
-
-        return df
-    else:
-        st.error("Error al obtener datos de la API")
-        return pd.DataFrame()
-
-# Función modificada para obtener datos históricos con periodo personalizable
-@st.cache_data(ttl=3600, show_spinner=False)
-def get_crypto_data(crypto_id="bitcoin", days="30"):
-    url = f"https://api.coingecko.com/api/v3/coins/{crypto_id}/market_chart"
-    
-    # Para 3 años, convertimos a días
-    if days == "1095":  # 3 años * 365 días
-        params = {"vs_currency": "usd", "days": "max"}  # Usamos "max" para obtener todo el historial disponible
-    else:
-        params = {"vs_currency": "usd", "days": days}
-    
-    response = requests.get(url, params=params)
-    
-    # Verificar si la respuesta es válida y contiene 'prices'
-    if response.status_code == 200:
-        data = response.json()
-        
-        # Verificar si 'prices' está presente en la respuesta
-        if 'prices' in data:
-            # Si es el caso de 3 años, filtramos para los últimos 3 años
-            if days == "1095":
-                prices = data.get('prices', [])
-                if prices:
-                    # Convertir timestamps a datetime para filtrar
-                    from datetime import datetime, timedelta
-                    now = datetime.now()
-                    three_years_ago = now - timedelta(days=1095)
-                    three_years_ago_ms = int(three_years_ago.timestamp() * 1000)
-                    
-                    # Filtrar solo los últimos 3 años
-                    filtered_prices = [price for price in prices if price[0] >= three_years_ago_ms]
-                    data['prices'] = filtered_prices
-            
-            return data
-        else:
-            st.error(f"No se encontraron datos de precios para la criptomoneda {crypto_id}.")
-            return None
-    else:
-        st.error("Error al obtener datos de la API. Código de respuesta: {}".format(response.status_code))
-        return None
-
-# Función para obtener noticias sobre criptomonedas
-@st.cache_data(ttl=3600, show_spinner=False)
-def get_crypto_news(limit=10):
-    """
-    Obtiene las últimas noticias sobre criptomonedas desde CryptoCompare API
-    """
-    try:
-        # URL de la API de CryptoCompare para noticias
-        news_url = "https://min-api.cryptocompare.com/data/v2/news/?lang=EN"
-        
-        # Enviar solicitud a la API
-        response = requests.get(news_url)
-        
-        # Verificar si la respuesta es válida
-        if response.status_code == 200:
-            news_data = response.json()
-            # Extraer las noticias del objeto de respuesta
-            if 'Data' in news_data:
-                # Limitar el número de noticias según el parámetro limit
-                return news_data['Data'][:limit]
-            else:
-                st.error("Formato de respuesta de noticias inesperado")
-                return []
-        else:
-            st.error(f"Error al obtener noticias. Código de respuesta: {response.status_code}")
-            return []
-    except Exception as e:
-        st.error(f"Error al obtener noticias: {e}")
-        return []
-
-# Función para mostrar noticias en un formato agradable
-def display_news(news_items):
-    """
-    Muestra las noticias en un formato de tarjetas atractivas
-    """
-    if not news_items:
-        st.info("No hay noticias disponibles en este momento.")
-        return
-        
-    for item in news_items:
-        # Crear una tarjeta para cada noticia
-        with st.container():
-            st.markdown(f"""
-            <div class="news-card">
-                <div class="news-title">{item.get('title', 'Sin título')}</div>
-                <div class="news-source">Fuente: {item.get('source', 'Desconocido')}</div>
-                <div class="news-date">Publicado: {format_timestamp(item.get('published_on', 0))}</div>
-                <div class="news-body">{item.get('body', '')[:200]}...</div>
-                <a href="{item.get('url', '#')}" target="_blank" class="news-link">Leer más</a>
-            </div>
-            """, unsafe_allow_html=True)
-
-def format_timestamp(timestamp):
-    """
-    Convierte un timestamp UNIX a un formato de fecha legible
-    """
-    if timestamp:
-        return datetime.fromtimestamp(timestamp).strftime('%d/%m/%Y %H:%M')
-    return "Fecha desconocida"
 
 def price_time_graph(crypto_id):
     # Opciones de periodo de tiempo (eliminada la opción de 3 años)
@@ -374,8 +235,6 @@ def price_time_graph(crypto_id):
         else:
             st.error("No se pudo cargar el gráfico de precios.")
 
-# Agregar el logo y el nombre de la aplicación en la barra lateral
-
 st.sidebar.markdown(
     """
     <div style="display: flex; flex-direction: column; align-items: center;">
@@ -386,13 +245,11 @@ st.sidebar.markdown(
     unsafe_allow_html=True
 )
 
-# Menú de navegación en la barra lateral sin el título
 nav_option = st.sidebar.radio(
     "",
-    ("Datos en Tiempo Real", "Comparación de Precios", "Capitalización de Mercado", "Gráfico de Precio", "Destacadas de Hoy", "Noticias de Criptomonedas"),
+    ("Datos en Tiempo Real", "Comparación de Precios", "Capitalización de Mercado", "Gráfico de Precio", "Destacadas de Hoy", "Noticias"),
     index=0  # La opción por defecto es "Datos en Tiempo Real"
 )
-
 
 # Obtener los datos
 with st.spinner("Cargando datos..."):
@@ -518,9 +375,8 @@ elif nav_option == "Destacadas de Hoy":
     else:
         st.warning("No se encontraron datos disponibles.")
 
-
 # Nueva sección: Noticias de Criptomonedas
-elif nav_option == "Noticias de Criptomonedas":
+elif nav_option == "Noticias":
     st.header("📰 Últimas Noticias de Criptomonedas")
     st.divider()
     # Opciones para filtrar noticias
