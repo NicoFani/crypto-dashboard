@@ -456,25 +456,67 @@ elif nav_option == "Gráfico de Precio":
 elif nav_option == "Destacadas de Hoy":
     st.header("⚡ Criptomonedas Destacadas del Día")
     st.divider()
-    # Identificamos las criptomonedas destacadas
-    max_price = df.loc[df["price_change_percentage_24h"].idxmax()]
-    min_price = df.loc[df["price_change_percentage_24h"].idxmin()]
-    max_market_cap = df.loc[df["market_cap_change_percentage_24h"].idxmax()]
-    max_volume = df.loc[df["Volumen Total"].idxmax()]  # Mayor volumen total en 24h
 
-    # Mostrar resultados en tarjetas informativas
-    col1, col2 = st.columns(2)
+    # Asegurarse de que el DataFrame no esté vacío
+    if not df.empty:
+        # Verificar si las columnas relevantes tienen datos
+        if 'price_change_percentage_24h' in df.columns and not df['price_change_percentage_24h'].isna().all():
+            max_price = df.loc[df["price_change_percentage_24h"].idxmax()]
+            min_price = df.loc[df["price_change_percentage_24h"].idxmin()]
+        else:
+            max_price = min_price = None
 
-    with col1:
-        st.metric(label="📈 Mayor subida de precio", value=max_price["Nombre"], delta=f"{max_price['price_change_percentage_24h']:.2f}%")
-        st.metric(label="🏆 Mayor crecimiento Market Cap", value=max_market_cap["Nombre"], delta=f"{max_market_cap['market_cap_change_percentage_24h']:.2f}%")
+        if 'market_cap_change_percentage_24h' in df.columns and not df['market_cap_change_percentage_24h'].isna().all():
+            max_market_cap = df.loc[df["market_cap_change_percentage_24h"].idxmax()]
+        else:
+            max_market_cap = None
 
-    with col2:
-        st.metric(label="📉 Mayor caída de precio", value=min_price["Nombre"], delta=f"{min_price['price_change_percentage_24h']:.2f}%")
-        st.metric(label="🔥 Mayor volumen total", value=max_volume["Nombre"], delta=f"{max_volume['Volumen Total']:.2f} USD")
+        if 'Volumen Total' in df.columns and not df['Volumen Total'].isna().all():
+            max_volume = df.loc[df["Volumen Total"].idxmax()]
+        else:
+            max_volume = None
 
-    st.markdown("_Datos actualizados diariamente._")
+        # Criptomoneda más cercana a su ATH utilizando 'ath_change_percentage'
+        if 'ath_change_percentage' in df.columns and not df['ath_change_percentage'].isna().all():
+            closest_to_ath = df.loc[df["ath_change_percentage"].abs().idxmin()]  # Cripto con el menor porcentaje de cambio respecto al ATH
+        else:
+            closest_to_ath = None
+        
+        # Mejor ROI: Filtrar las criptomonedas con ROI no nulo
+        if 'roi' in df.columns:
+            df_valid_roi = df[df['roi'].notna()]  # Filtrar criptos con ROI no nulo
+            if not df_valid_roi.empty:
+                df_valid_roi['roi_percentage'] = df_valid_roi['roi'].apply(lambda x: x['percentage'] if isinstance(x, dict) else None)
+                best_roi = df_valid_roi.loc[df_valid_roi["roi_percentage"].idxmax()]  # Cripto con el mejor ROI
+            else:
+                best_roi = None
+        else:
+            best_roi = None
 
+        # Mostrar resultados en tarjetas informativas
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            if max_price is not None:
+                st.metric(label="📈 Mayor subida de precio", value=max_price["Nombre"], delta=f"{max_price['price_change_percentage_24h']:.2f}%")
+            if max_market_cap is not None:
+                st.metric(label="🏆 Mayor crecimiento Market Cap", value=max_market_cap["Nombre"], delta=f"{max_market_cap['market_cap_change_percentage_24h']:.2f}%")
+        
+        with col2:
+            if min_price is not None:
+                st.metric(label="📉 Mayor caída de precio", value=min_price["Nombre"], delta=f"{min_price['price_change_percentage_24h']:.2f}%")
+            if max_volume is not None:
+                st.metric(label="🔥 Mayor volumen total", value=max_volume["Nombre"], delta=f"{max_volume['Volumen Total']:.2f} USD")
+        
+        with col3:
+            if closest_to_ath is not None:
+                st.metric(label="💎 Más cercana a ATH", value=closest_to_ath["Nombre"], delta=f"{closest_to_ath['ath_change_percentage']:.2f}%")
+            if best_roi is not None:
+                st.metric(label="💰 Mejor ROI", value=best_roi["Nombre"], delta=f"{best_roi['roi_percentage']:.2f}%")
+        
+        st.markdown("_Datos actualizados diariamente._")
+    else:
+        st.warning("No se encontraron datos disponibles.")
 
 
 # Nueva sección: Noticias de Criptomonedas
